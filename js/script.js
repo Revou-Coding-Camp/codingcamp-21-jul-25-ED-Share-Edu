@@ -14,25 +14,21 @@ class TodoApp {
     }
 
     bindEvents() {
-        // Form submission
         document.getElementById('taskForm').addEventListener('submit', (e) => {
             e.preventDefault();
             this.handleFormSubmit();
         });
 
-        // Filter buttons
         document.querySelectorAll('.btn-filter').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.setFilter(e.target.dataset.filter);
             });
         });
 
-        // Clear completed button
         document.getElementById('clearCompleted').addEventListener('click', () => {
             this.clearCompleted();
         });
 
-        // Input validation
         document.getElementById('taskInput').addEventListener('input', () => {
             this.clearError('taskInput', 'taskError');
         });
@@ -47,7 +43,6 @@ class TodoApp {
         const dateInput = document.getElementById('dateInput');
         const priorityInput = document.getElementById('priorityInput');
 
-        // Validate inputs
         let isValid = true;
 
         if (!taskInput.value.trim()) {
@@ -62,59 +57,63 @@ class TodoApp {
 
         if (isValid) {
             this.addTask({
+                id: Date.now(),
                 text: taskInput.value.trim(),
                 dueDate: dateInput.value,
-                priority: priorityInput.value
+                priority: priorityInput.value,
+                completed: false
             });
 
-            // Reset form
-            taskInput.value = '';
-            dateInput.value = '';
-            priorityInput.value = 'medium';
+            // Reset form fields
+            taskInput.value = "";
+            dateInput.value = "";
+            priorityInput.value = "medium";
         }
     }
 
-    showError(inputId, errorId) {
-        const input = document.getElementById(inputId);
-        const error = document.getElementById(errorId);
-        
-        input.classList.add('error');
-        error.classList.add('show');
-    }
-
-    clearError(inputId, errorId) {
-        const input = document.getElementById(inputId);
-        const error = document.getElementById(errorId);
-        
-        input.classList.remove('error');
-        error.classList.remove('show');
-    }
-
-    addTask(taskData) {
-        const task = {
-            id: Date.now(),
-            text: taskData.text,
-            dueDate: taskData.dueDate,
-            priority: taskData.priority,
-            completed: false,
-            createdAt: new Date().toISOString()
-        };
-
+    addTask(task) {
         this.tasks.push(task);
         this.saveTasks();
         this.render();
         this.updateStats();
     }
 
-    deleteTask(id) {
-        this.tasks = this.tasks.filter(task => task.id !== id);
-        this.saveTasks();
-        this.render();
-        this.updateStats();
+    render() {
+        const taskList = document.getElementById('taskList');
+        taskList.innerHTML = "";
+
+        const filteredTasks = this.getFilteredTasks();
+
+        filteredTasks.forEach(task => {
+            const taskItem = document.createElement('div');
+            taskItem.className = `task-item priority-${task.priority}`;
+            if (task.completed) taskItem.classList.add('completed');
+
+            taskItem.innerHTML = `
+                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
+                <div class="task-content">
+                    <p class="task-text">${task.text}</p>
+                    <small>Due: ${task.dueDate}</small>
+                </div>
+                <button class="btn btn-delete" data-id="${task.id}">🗑️</button>
+            `;
+
+            // Checkbox toggle
+            taskItem.querySelector('.task-checkbox').addEventListener('change', (e) => {
+                this.toggleTask(e.target.dataset.id);
+            });
+
+            // Delete button
+            taskItem.querySelector('.btn-delete').addEventListener('click', (e) => {
+                this.deleteTask(e.target.dataset.id);
+            });
+
+            taskList.appendChild(taskItem);
+        });
     }
 
     toggleTask(id) {
-        const task = this.tasks.find(task => task.id === id);
+        const task = this.tasks.find(t => t.id == id);
         if (task) {
             task.completed = !task.completed;
             this.saveTasks();
@@ -123,8 +122,15 @@ class TodoApp {
         }
     }
 
+    deleteTask(id) {
+        this.tasks = this.tasks.filter(t => t.id != id);
+        this.saveTasks();
+        this.render();
+        this.updateStats();
+    }
+
     clearCompleted() {
-        this.tasks = this.tasks.filter(task => !task.completed);
+        this.tasks = this.tasks.filter(t => !t.completed);
         this.saveTasks();
         this.render();
         this.updateStats();
@@ -132,134 +138,53 @@ class TodoApp {
 
     setFilter(filter) {
         this.currentFilter = filter;
-        
-        // Update active button
-        document.querySelectorAll('.btn-filter').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
-        
+        document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.btn-filter[data-filter="${filter}"]`).classList.add('active');
         this.render();
     }
 
     getFilteredTasks() {
-        const today = new Date().toISOString().split('T')[0];
-        
-        return this.tasks.filter(task => {
-            switch(this.currentFilter) {
-                case 'pending':
-                    return !task.completed;
-                case 'completed':
-                    return task.completed;
-                case 'overdue':
-                    return !task.completed && task.dueDate < today;
-                case 'high':
-                    return task.priority === 'high';
-                default:
-                    return true;
-            }
-        });
-    }
-
-    isOverdue(task) {
-        const today = new Date().toISOString().split('T')[0];
-        return !task.completed && task.dueDate < today;
-    }
-
-    formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
-        });
-    }
-
-    render() {
-        const taskList = document.getElementById('taskList');
-        const emptyState = document.getElementById('emptyState');
-        const filteredTasks = this.getFilteredTasks();
-
-        if (filteredTasks.length === 0) {
-            taskList.innerHTML = '';
-            taskList.appendChild(emptyState);
-            return;
-        }
-
-        // Remove empty state if it exists
-        if (emptyState.parentNode) {
-            emptyState.remove();
-        }
-
-        taskList.innerHTML = filteredTasks.map(task => {
-            const isOverdue = this.isOverdue(task);
-            const priorityClass = `priority-${task.priority}`;
-            
-            return `
-                <div class="task-item ${task.completed ? 'completed' : ''} ${task.priority === 'high' ? 'high-priority' : ''} ${isOverdue ? 'overdue' : ''}">
-                    <div class="task-header">
-                        <div class="task-content">
-                            <div style="display: flex; align-items: center;">
-                                <input 
-                                    type="checkbox" 
-                                    class="task-checkbox"
-                                    ${task.completed ? 'checked' : ''} 
-                                    onchange="todoApp.toggleTask(${task.id})"
-                                >
-                                <div class="task-text">${task.text}</div>
-                            </div>
-                            <div class="task-meta">
-                                <span>📅 ${this.formatDate(task.dueDate)}</span>
-                                <span class="priority-badge ${priorityClass}">
-                                    ${task.priority} priority
-                                </span>
-                                ${task.completed ? '<span style="color: #28a745;">✅ Completed</span>' : ''}
-                                ${isOverdue ? '<span style="color: #dc3545;">⚠️ Overdue</span>' : ''}
-                            </div>
-                        </div>
-                        <div class="task-actions">
-                            <button 
-                                class="btn btn-delete"
-                                onclick="todoApp.deleteTask(${task.id})"
-                                title="Delete task"
-                            >
-                                Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        if (this.currentFilter === 'completed') return this.tasks.filter(t => t.completed);
+        if (this.currentFilter === 'active') return this.tasks.filter(t => !t.completed);
+        return this.tasks;
     }
 
     updateStats() {
         const total = this.tasks.length;
-        const completed = this.tasks.filter(task => task.completed).length;
-        const pending = this.tasks.filter(task => !task.completed).length;
-        const overdue = this.tasks.filter(task => this.isOverdue(task)).length;
+        const completed = this.tasks.filter(t => t.completed).length;
+        const active = total - completed;
 
         document.getElementById('totalTasks').textContent = total;
         document.getElementById('completedTasks').textContent = completed;
-        document.getElementById('pendingTasks').textContent = pending;
-        document.getElementById('overdueTasks').textContent = overdue;
+        document.getElementById('activeTasks').textContent = active;
+    }
+
+    showError(inputId, errorId) {
+        document.getElementById(inputId).classList.add('error');
+        document.getElementById(errorId).style.display = 'block';
+    }
+
+    clearError(inputId, errorId) {
+        document.getElementById(inputId).classList.remove('error');
+        document.getElementById(errorId).style.display = 'none';
     }
 
     setMinDate() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('dateInput').min = today;
+        const today = new Date().toISOString().split("T")[0];
+        document.getElementById("dateInput").setAttribute("min", today);
     }
 
     saveTasks() {
-        localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+        localStorage.setItem("todoTasks", JSON.stringify(this.tasks));
     }
 
     loadTasks() {
-        const saved = localStorage.getItem('todoTasks');
-        return saved ? JSON.parse(saved) : [];
+        const data = localStorage.getItem("todoTasks");
+        return data ? JSON.parse(data) : [];
     }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.todoApp = new TodoApp();
+// Inisialisasi aplikasi
+window.addEventListener("DOMContentLoaded", () => {
+    new TodoApp();
 });
