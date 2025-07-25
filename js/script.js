@@ -1,165 +1,265 @@
-let tasks = [];
-let currentFilter = 'all';
-
-// Form validation and submission
-document.getElementById('taskForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const taskInput = document.getElementById('taskInput');
-    const dateInput = document.getElementById('dateInput');
-    const taskError = document.getElementById('taskError');
-    const dateError = document.getElementById('dateError');
-    
-    // Reset errors
-    taskError.classList.add('hidden');
-    dateError.classList.add('hidden');
-    taskInput.classList.remove('border-red-500');
-    dateInput.classList.remove('border-red-500');
-    
-    let isValid = true;
-    
-    // Validate task input
-    if (!taskInput.value.trim()) {
-        taskError.classList.remove('hidden');
-        taskInput.classList.add('border-red-500');
-        isValid = false;
+// Task Management System
+class TodoApp {
+    constructor() {
+        this.tasks = this.loadTasks();
+        this.currentFilter = 'all';
+        this.init();
     }
-    
-    // Validate date input
-    if (!dateInput.value) {
-        dateError.classList.remove('hidden');
-        dateInput.classList.add('border-red-500');
-        isValid = false;
+
+    init() {
+        this.bindEvents();
+        this.setMinDate();
+        this.render();
+        this.updateStats();
     }
-    
-    if (isValid) {
-        addTask(taskInput.value.trim(), dateInput.value);
-        taskInput.value = '';
-        dateInput.value = '';
+
+    bindEvents() {
+        // Form submission
+        document.getElementById('taskForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.handleFormSubmit();
+        });
+
+        // Filter buttons
+        document.querySelectorAll('.btn-filter').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.setFilter(e.target.dataset.filter);
+            });
+        });
+
+        // Clear completed button
+        document.getElementById('clearCompleted').addEventListener('click', () => {
+            this.clearCompleted();
+        });
+
+        // Input validation
+        document.getElementById('taskInput').addEventListener('input', () => {
+            this.clearError('taskInput', 'taskError');
+        });
+
+        document.getElementById('dateInput').addEventListener('change', () => {
+            this.clearError('dateInput', 'dateError');
+        });
     }
-});
 
-function addTask(description, dueDate) {
-    const task = {
-        id: Date.now(),
-        description: description,
-        dueDate: dueDate,
-        completed: false,
-        createdAt: new Date()
-    };
-    
-    tasks.push(task);
-    renderTasks();
-    updateTaskCount();
-}
+    handleFormSubmit() {
+        const taskInput = document.getElementById('taskInput');
+        const dateInput = document.getElementById('dateInput');
+        const priorityInput = document.getElementById('priorityInput');
 
-function deleteTask(id) {
-    tasks = tasks.filter(task => task.id !== id);
-    renderTasks();
-    updateTaskCount();
-}
+        // Validate inputs
+        let isValid = true;
 
-function toggleTask(id) {
-    const task = tasks.find(task => task.id === id);
-    if (task) {
-        task.completed = !task.completed;
-        renderTasks();
-        updateTaskCount();
+        if (!taskInput.value.trim()) {
+            this.showError('taskInput', 'taskError');
+            isValid = false;
+        }
+
+        if (!dateInput.value) {
+            this.showError('dateInput', 'dateError');
+            isValid = false;
+        }
+
+        if (isValid) {
+            this.addTask({
+                text: taskInput.value.trim(),
+                dueDate: dateInput.value,
+                priority: priorityInput.value
+            });
+
+            // Reset form
+            taskInput.value = '';
+            dateInput.value = '';
+            priorityInput.value = 'medium';
+        }
     }
-}
 
-function filterTasks(filter) {
-    currentFilter = filter;
-    
-    // Update active filter button
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.remove('ring-2', 'ring-offset-2', 'ring-blue-500');
-    });
-    event.target.classList.add('ring-2', 'ring-offset-2', 'ring-blue-500');
-    
-    renderTasks();
-}
-
-function getFilteredTasks() {
-    const today = new Date().toISOString().split('T')[0];
-    
-    switch(currentFilter) {
-        case 'pending':
-            return tasks.filter(task => !task.completed);
-        case 'completed':
-            return tasks.filter(task => task.completed);
-        case 'overdue':
-            return tasks.filter(task => !task.completed && task.dueDate < today);
-        default:
-            return tasks;
-    }
-}
-
-function renderTasks() {
-    const taskList = document.getElementById('taskList');
-    const emptyState = document.getElementById('emptyState');
-    const filteredTasks = getFilteredTasks();
-    
-    if (filteredTasks.length === 0) {
-        taskList.innerHTML = '';
-        taskList.appendChild(emptyState);
-        return;
-    }
-    
-    emptyState.remove();
-    
-    taskList.innerHTML = filteredTasks.map(task => {
-        const today = new Date().toISOString().split('T')[0];
-        const isOverdue = !task.completed && task.dueDate < today;
-        const formattedDate = new Date(task.dueDate).toLocaleDateString();
+    showError(inputId, errorId) {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
         
-        return `
-            <div class="task-item bg-gray-50 rounded-lg p-4 border-l-4 ${task.completed ? 'border-green-500' : isOverdue ? 'border-red-500' : 'border-blue-500'} fade-in">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-3 flex-1">
-                        <input 
-                            type="checkbox" 
-                            ${task.completed ? 'checked' : ''} 
-                            onchange="toggleTask(${task.id})"
-                            class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                        >
-                        <div class="flex-1">
-                            <p class="text-gray-800 font-medium ${task.completed ? 'completed' : ''}">${task.description}</p>
-                            <div class="flex items-center space-x-4 mt-1">
-                                <span class="text-sm text-gray-600">📅 ${formattedDate}</span>
-                                ${task.completed ? '<span class="text-sm text-green-600 font-medium">✅ Completed</span>' : ''}
-                                ${isOverdue ? '<span class="text-sm text-red-600 font-medium">⚠️ Overdue</span>' : ''}
+        input.classList.add('error');
+        error.classList.add('show');
+    }
+
+    clearError(inputId, errorId) {
+        const input = document.getElementById(inputId);
+        const error = document.getElementById(errorId);
+        
+        input.classList.remove('error');
+        error.classList.remove('show');
+    }
+
+    addTask(taskData) {
+        const task = {
+            id: Date.now(),
+            text: taskData.text,
+            dueDate: taskData.dueDate,
+            priority: taskData.priority,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+
+        this.tasks.push(task);
+        this.saveTasks();
+        this.render();
+        this.updateStats();
+    }
+
+    deleteTask(id) {
+        this.tasks = this.tasks.filter(task => task.id !== id);
+        this.saveTasks();
+        this.render();
+        this.updateStats();
+    }
+
+    toggleTask(id) {
+        const task = this.tasks.find(task => task.id === id);
+        if (task) {
+            task.completed = !task.completed;
+            this.saveTasks();
+            this.render();
+            this.updateStats();
+        }
+    }
+
+    clearCompleted() {
+        this.tasks = this.tasks.filter(task => !task.completed);
+        this.saveTasks();
+        this.render();
+        this.updateStats();
+    }
+
+    setFilter(filter) {
+        this.currentFilter = filter;
+        
+        // Update active button
+        document.querySelectorAll('.btn-filter').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+        
+        this.render();
+    }
+
+    getFilteredTasks() {
+        const today = new Date().toISOString().split('T')[0];
+        
+        return this.tasks.filter(task => {
+            switch(this.currentFilter) {
+                case 'pending':
+                    return !task.completed;
+                case 'completed':
+                    return task.completed;
+                case 'overdue':
+                    return !task.completed && task.dueDate < today;
+                case 'high':
+                    return task.priority === 'high';
+                default:
+                    return true;
+            }
+        });
+    }
+
+    isOverdue(task) {
+        const today = new Date().toISOString().split('T')[0];
+        return !task.completed && task.dueDate < today;
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    }
+
+    render() {
+        const taskList = document.getElementById('taskList');
+        const emptyState = document.getElementById('emptyState');
+        const filteredTasks = this.getFilteredTasks();
+
+        if (filteredTasks.length === 0) {
+            taskList.innerHTML = '';
+            taskList.appendChild(emptyState);
+            return;
+        }
+
+        // Remove empty state if it exists
+        if (emptyState.parentNode) {
+            emptyState.remove();
+        }
+
+        taskList.innerHTML = filteredTasks.map(task => {
+            const isOverdue = this.isOverdue(task);
+            const priorityClass = `priority-${task.priority}`;
+            
+            return `
+                <div class="task-item ${task.completed ? 'completed' : ''} ${task.priority === 'high' ? 'high-priority' : ''} ${isOverdue ? 'overdue' : ''}">
+                    <div class="task-header">
+                        <div class="task-content">
+                            <div style="display: flex; align-items: center;">
+                                <input 
+                                    type="checkbox" 
+                                    class="task-checkbox"
+                                    ${task.completed ? 'checked' : ''} 
+                                    onchange="todoApp.toggleTask(${task.id})"
+                                >
+                                <div class="task-text">${task.text}</div>
+                            </div>
+                            <div class="task-meta">
+                                <span>📅 ${this.formatDate(task.dueDate)}</span>
+                                <span class="priority-badge ${priorityClass}">
+                                    ${task.priority} priority
+                                </span>
+                                ${task.completed ? '<span style="color: #28a745;">✅ Completed</span>' : ''}
+                                ${isOverdue ? '<span style="color: #dc3545;">⚠️ Overdue</span>' : ''}
                             </div>
                         </div>
+                        <div class="task-actions">
+                            <button 
+                                class="btn btn-delete"
+                                onclick="todoApp.deleteTask(${task.id})"
+                                title="Delete task"
+                            >
+                                Delete
+                            </button>
+                        </div>
                     </div>
-                    <button 
-                        onclick="deleteTask(${task.id})"
-                        class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                        title="Delete task"
-                    >
-                        🗑️
-                    </button>
                 </div>
-            </div>
-        `;
-    }).join('');
-}
+            `;
+        }).join('');
+    }
 
-function updateTaskCount() {
-    const taskCount = document.getElementById('taskCount');
-    const filteredTasks = getFilteredTasks();
-    const completedCount = filteredTasks.filter(task => task.completed).length;
-    
-    if (filteredTasks.length === 0) {
-        taskCount.textContent = '0 tasks';
-    } else {
-        taskCount.textContent = `${filteredTasks.length} tasks (${completedCount} completed)`;
+    updateStats() {
+        const total = this.tasks.length;
+        const completed = this.tasks.filter(task => task.completed).length;
+        const pending = this.tasks.filter(task => !task.completed).length;
+        const overdue = this.tasks.filter(task => this.isOverdue(task)).length;
+
+        document.getElementById('totalTasks').textContent = total;
+        document.getElementById('completedTasks').textContent = completed;
+        document.getElementById('pendingTasks').textContent = pending;
+        document.getElementById('overdueTasks').textContent = overdue;
+    }
+
+    setMinDate() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateInput').min = today;
+    }
+
+    saveTasks() {
+        localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+    }
+
+    loadTasks() {
+        const saved = localStorage.getItem('todoTasks');
+        return saved ? JSON.parse(saved) : [];
     }
 }
 
-// Set minimum date to today
-document.getElementById('dateInput').min = new Date().toISOString().split('T')[0];
-
-// Initialize
-renderTasks();
-updateTaskCount();
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.todoApp = new TodoApp();
+});
